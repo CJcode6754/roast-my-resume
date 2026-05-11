@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-  /* Colors */
   --color-paper:      #fdf8ee;
   --color-paper-bg:   #c9bfa8;
   --color-ink:        #1a0f00;
@@ -11,7 +10,6 @@
   --color-rule:       #c8b88a;
   --color-stamp:      rgba(150, 30, 30, 0.7);
 
-  /* Typography */
   --font-display:     'Special Elite', cursive;
   --font-body:        'Courier Prime', monospace;
   --font-italic:      'IM Fell English', serif;

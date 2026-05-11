@@ -1,6 +1,5 @@
 /**
  * Calculates "Career Concern Index" (0–100) based on roast content.
- * Used to animate the rating bar — heavier language = higher score.
  */
 export function getIntensity(text) {
   const words = [
