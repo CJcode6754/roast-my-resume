@@ -4,7 +4,8 @@ const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-auth',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
@@ -13,19 +14,32 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  try {
-    const { resumeText, systemPrompt } = await req.json()
+  console.log('Function invoked: roast');
 
+  try {
+    if (!GROQ_API_KEY) {
+      console.error('CRITICAL: GROQ_API_KEY is not set in environment variables!');
+      throw new Error('The Bureau is missing its secret decryption key (GROQ_API_KEY).');
+    }
+
+    const { resumeText, systemPrompt } = await req.json()
     if (!resumeText) throw new Error('Resume text is required')
+
+    console.log('Sending request to Groq API...');
+    
+    // Create an abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${GROQ_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "llama-3.1-8b-instant",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Evaluate this resume:\n\n${resumeText}` }
@@ -35,7 +49,18 @@ serve(async (req) => {
       }),
     })
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Groq API Error:', errorText);
+      return new Response(JSON.stringify({ error: 'Groq API error', details: errorText }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: response.status,
+      })
+    }
+
     const data = await response.json()
+    clearTimeout(timeoutId);
+
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

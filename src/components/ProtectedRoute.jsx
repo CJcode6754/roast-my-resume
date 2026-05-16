@@ -1,7 +1,8 @@
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthProvider';
+import { memo } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
-export function ProtectedRoute({ children, adminOnly = false }) {
+function ProtectedRouteComponent({ children, adminOnly = false }) {
   const { user, isAdmin, loading } = useAuth();
 
   if (loading) {
@@ -27,3 +28,5 @@ export function ProtectedRoute({ children, adminOnly = false }) {
 
   return children;
 }
+
+export const ProtectedRoute = memo(ProtectedRouteComponent);

@@ -6,7 +6,7 @@ import { EvaluationResult } from '../components/EvaluationResult';
 import { useGroqRoast } from '../hooks/useGroqRoast';
 import { extractPdfText } from '../utils/extractPdfText';
 import { getIntensity } from '../utils/intensityScore';
-import { useAuth } from '../context/AuthProvider';
+import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabaseClient';
 import { roastLimiter, publishLimiter } from '../lib/rateLimiter';
 

@@ -12,12 +12,35 @@ export function useGroqRoast() {
     setRoast('');
 
     try {
-      // Call the secure Supabase Edge Function instead of calling Groq directly
-      const { data, error: funcError } = await supabase.functions.invoke('roast', {
-        body: { resumeText, systemPrompt },
+      console.log('Edge Function: Calling "roast" function via direct fetch...');
+      
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      // Safety timeout for the frontend request
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/roast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({ resumeText, systemPrompt }),
+        signal: controller.signal
       });
 
-      if (funcError) throw funcError;
+      clearTimeout(id);
+      console.log('Edge Function: Response status:', response.status);
+      
+      const data = await response.json();
+      console.log('Edge Function: Received data:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || `Server responded with ${response.status}`);
+      }
       
       // The function returns the full Groq response
       if (data.error) throw new Error(data.error.message || 'AI processing error');

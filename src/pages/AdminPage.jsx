@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../context/AuthProvider';
+import { useAuth } from '../hooks/useAuth';
 
 export default function AdminPage() {
   const { isAdmin } = useAuth();
@@ -10,52 +10,96 @@ export default function AdminPage() {
   const [roastCount, setRoastCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState('');
+  const [saveStatus, setSaveStatus] = useState({ type: null, message: '' });
+  const [errors, setErrors] = useState({ settings: null, users: null, roasts: null });
 
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
-    setLoading(true);
-
-    const [settingsRes, usersRes, roastsRes] = await Promise.all([
-      supabase.from('app_settings').select('*').eq('id', 1).single(),
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-      supabase.from('roast_results').select('id', { count: 'exact', head: true })
-    ]);
-
-    if (settingsRes.data) {
-      setRoasterEnabled(settingsRes.data.roaster_enabled);
-      setMaintenanceMsg(settingsRes.data.maintenance_message || '');
+    if (!supabase) {
+      setLoading(false);
+      return;
     }
 
-    if (usersRes.data) setUsers(usersRes.data);
-    if (roastsRes.count !== null) setRoastCount(roastsRes.count);
+    setLoading(true);
+    setErrors({ settings: null, users: null, roasts: null });
 
-    setLoading(false);
+    // Fetch each piece of data independently to prevent one hang from blocking everything
+    
+    // 1. Settings
+    supabase.from('app_settings')
+      .select('*')
+      .eq('id', 1)
+      .single()
+      .then(({ data, error }) => {
+        if (data) {
+          setRoasterEnabled(data.roaster_enabled);
+          setMaintenanceMsg(data.maintenance_message || '');
+        }
+        if (error) {
+          console.error('Admin settings error:', error);
+          setErrors(prev => ({ ...prev, settings: error.message }));
+        }
+      })
+      .catch(err => setErrors(prev => ({ ...prev, settings: err.message })));
+
+    // 2. Users
+    supabase.from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (data) setUsers(data);
+        if (error) {
+          console.error('Admin users error:', error);
+          setErrors(prev => ({ ...prev, users: error.message }));
+        }
+      })
+      .catch(err => setErrors(prev => ({ ...prev, users: err.message })));
+
+    // 3. Roast Count
+    supabase.from('roast_results')
+      .select('id', { count: 'exact', head: true })
+      .then(({ count, error }) => {
+        if (count !== null) setRoastCount(count);
+        if (error) {
+          console.error('Admin roast count error:', error);
+          setErrors(prev => ({ ...prev, roasts: error.message }));
+        }
+      })
+      .catch(err => setErrors(prev => ({ ...prev, roasts: err.message })))
+      .finally(() => {
+        // Stop loading after a short delay to give parallel requests time
+        setTimeout(() => setLoading(false), 800);
+      });
+
+    // Global Safety Timeout: Force stop loading after 5 seconds no matter what
+    setTimeout(() => {
+      setLoading(false);
+    }, 5000);
   };
 
   const handleSave = async () => {
     setSaving(true);
-    setSaveMsg('');
-
+    setSaveStatus({ type: null, message: '' });
+ 
     const { error } = await supabase
-      .from('app_settings')
-      .update({
-        roaster_enabled: roasterEnabled,
-        maintenance_message: maintenanceMsg
-      })
-      .eq('id', 1);
-
+       .from('app_settings')
+       .update({
+         roaster_enabled: roasterEnabled,
+         maintenance_message: maintenanceMsg
+       })
+       .eq('id', 1);
+ 
     if (error) {
-      setSaveMsg(`Error: ${error.message}`);
+      setSaveStatus({ type: 'error', message: `Error: ${error.message}` });
     } else {
-      setSaveMsg('Settings updated successfully.');
+      setSaveStatus({ type: 'success', message: 'Settings updated successfully.' });
     }
-
+ 
     setSaving(false);
-    setTimeout(() => setSaveMsg(''), 3000);
+    setTimeout(() => setSaveStatus({ type: null, message: '' }), 3000);
   };
 
   if (loading) {
@@ -112,16 +156,22 @@ export default function AdminPage() {
                 {roasterEnabled ? '🟢 Currently ACTIVE' : '🔴 Currently SUSPENDED'}
               </div>
             </div>
-            <button
-              onClick={() => setRoasterEnabled(!roasterEnabled)}
-              className={`px-4 py-2 font-display text-sm border-2 transition tracking-wider ${
-                roasterEnabled
-                  ? 'bg-ink-red/10 border-ink-red text-ink-red hover:bg-ink-red/20'
-                  : 'bg-rule/30 border-ink text-ink hover:bg-rule/50'
-              }`}
-            >
-              {roasterEnabled ? 'DISABLE' : 'ENABLE'}
-            </button>
+            {errors.settings ? (
+              <div className="text-xs text-ink-red font-body border border-ink-red p-2 bg-ink-red/5">
+                ⚠ Settings Access Denied
+              </div>
+            ) : (
+              <button
+                onClick={() => setRoasterEnabled(!roasterEnabled)}
+                className={`px-4 py-2 font-display text-sm border-2 transition tracking-wider ${
+                  roasterEnabled
+                    ? 'bg-ink-red/10 border-ink-red text-ink-red hover:bg-ink-red/20'
+                    : 'bg-rule/30 border-ink text-ink hover:bg-rule/50'
+                }`}
+              >
+                {roasterEnabled ? 'DISABLE' : 'ENABLE'}
+              </button>
+            )}
           </div>
 
           <div>
@@ -145,9 +195,9 @@ export default function AdminPage() {
             {saving ? 'SAVING...' : 'SAVE SETTINGS'}
           </button>
 
-          {saveMsg && (
-            <div className={`mt-2 text-xs font-body ${saveMsg.startsWith('Error') ? 'text-ink-red' : 'text-ink-muted'}`}>
-              {saveMsg}
+          {saveStatus.message && (
+            <div className={`mt-2 text-xs font-body ${saveStatus.type === 'error' ? 'text-ink-red' : 'text-ink-muted'}`}>
+              {saveStatus.message}
             </div>
           )}
         </div>
@@ -159,32 +209,40 @@ export default function AdminPage() {
           SECTION II — REGISTERED PERSONNEL ROSTER
         </label>
         <div className="border border-rule overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-rule/30 border-b border-rule">
-                <th className="text-left px-3 py-2 text-xs font-body text-ink-muted tracking-wider">EMAIL</th>
-                <th className="text-left px-3 py-2 text-xs font-body text-ink-muted tracking-wider">NAME</th>
-                <th className="text-left px-3 py-2 text-xs font-body text-ink-muted tracking-wider">ROLE</th>
-                <th className="text-left px-3 py-2 text-xs font-body text-ink-muted tracking-wider">JOINED</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-b border-rule/50 hover:bg-rule/10 transition">
-                  <td className="px-3 py-2 text-xs font-body text-ink">{u.email}</td>
-                  <td className="px-3 py-2 text-xs font-body text-ink">{u.display_name}</td>
-                  <td className="px-3 py-2 text-xs font-body">
-                    <span className={u.role === 'admin' ? 'text-ink-red font-bold' : 'text-ink-muted'}>
-                      {u.role.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-xs font-body text-ink-muted">
-                    {new Date(u.created_at).toLocaleDateString()}
-                  </td>
+          {errors.users ? (
+            <div className="p-8 text-center bg-rule/5">
+              <div className="text-ink-red mb-2 text-lg">🚫</div>
+              <div className="text-xs font-body text-ink-red">DATABASE PERMISSION DENIED</div>
+              <div className="text-[10px] text-ink-muted mt-1 uppercase">Error: {errors.users}</div>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="bg-rule/30 border-b border-rule">
+                  <th className="text-left px-3 py-2 text-xs font-body text-ink-muted tracking-wider">EMAIL</th>
+                  <th className="text-left px-3 py-2 text-xs font-body text-ink-muted tracking-wider">NAME</th>
+                  <th className="text-left px-3 py-2 text-xs font-body text-ink-muted tracking-wider">ROLE</th>
+                  <th className="text-left px-3 py-2 text-xs font-body text-ink-muted tracking-wider">JOINED</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b border-rule/50 hover:bg-rule/10 transition">
+                    <td className="px-3 py-2 text-xs font-body text-ink">{u.email}</td>
+                    <td className="px-3 py-2 text-xs font-body text-ink">{u.display_name}</td>
+                    <td className="px-3 py-2 text-xs font-body">
+                      <span className={u.role === 'admin' ? 'text-ink-red font-bold' : 'text-ink-muted'}>
+                        {u.role.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs font-body text-ink-muted">
+                      {new Date(u.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 

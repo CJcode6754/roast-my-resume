@@ -9,6 +9,8 @@ lerna-debug.log*
 
 .env
 supabase-setup.sql
+supabase/.temp/
+supabase/functions/.temp/
 
 node_modules
 dist

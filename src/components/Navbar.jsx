@@ -1,10 +1,29 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthProvider';
+import { memo, useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
-export function Navbar() {
+function NavbarComponent() {
   const { user, profile, isAdmin, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    
+    setIsLoggingOut(true);
+    try {
+      await signOut();
+      // Use replace: true to prevent back navigation to protected route
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.error('Logout navigation failed:', err);
+      // Fallback redirect
+      window.location.href = '/login';
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -45,13 +64,14 @@ export function Navbar() {
               {profile?.display_name || user.email}
             </span>
             <button
-              onClick={async () => {
-                await signOut();
-                navigate('/login');
-              }}
-              className="px-3 py-1 text-xs font-display text-ink-red border border-ink-red hover:bg-ink-red/10 transition tracking-wider"
+              onClick={handleLogout}
+              type="button"
+              disabled={isLoggingOut}
+              className={`px-3 py-1 text-xs font-display text-ink-red border border-ink-red transition tracking-wider ${
+                isLoggingOut ? 'opacity-50 cursor-wait' : 'hover:bg-ink-red/10 cursor-pointer'
+              }`}
             >
-              LOGOUT
+              {isLoggingOut ? 'LOGGING OUT...' : 'LOGOUT'}
             </button>
           </div>
         </div>
@@ -59,3 +79,5 @@ export function Navbar() {
     </nav>
   );
 }
+
+export const Navbar = memo(NavbarComponent);
