@@ -197,9 +197,11 @@ export default function RoasterPage() {
     const score = getIntensity(roast);
     const excerpt = roast.length > 500 ? roast.substring(0, 500) + '...' : roast;
 
+    const finalDisplayName = publishName.trim().substring(0, 50) || 'Anonymous Applicant';
+
     const { error: dbError } = await supabase.from('roast_results').insert({
       user_id: user.id,
-      display_name: publishName.trim() || 'Anonymous Applicant',
+      display_name: finalDisplayName,
       intensity_score: score,
       roast_excerpt: excerpt,
       is_public: true
@@ -309,6 +311,7 @@ export default function RoasterPage() {
               <div>
                 <label className="block text-xs text-ink-muted mb-1">DISPLAY NAME (optional)</label>
                 <input type="text" value={publishName} onChange={(e) => setPublishName(e.target.value)}
+                  maxLength={50}
                   placeholder="Anonymous Applicant"
                   className="w-full px-3 py-2 border-2 border-rule bg-paper font-body text-sm text-ink focus:border-ink focus:outline-none transition" />
               </div>

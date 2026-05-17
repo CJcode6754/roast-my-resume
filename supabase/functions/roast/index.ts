@@ -8,10 +8,32 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// In-memory backend rate limiting (IP-based)
+const rateLimitMap = new Map<string, { count: number, resetTime: number }>();
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  // IP Rate limiting check
+  const ip = req.headers.get('x-forwarded-for') || 'unknown';
+  const now = Date.now();
+  
+  if (ip !== 'unknown') {
+    const limitData = rateLimitMap.get(ip);
+    if (limitData && limitData.resetTime > now) {
+      if (limitData.count >= 15) { // 15 requests per hour hard limit
+        return new Response(JSON.stringify({ error: 'Backend rate limit exceeded. Too many requests.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429,
+        });
+      }
+      limitData.count++;
+    } else {
+      rateLimitMap.set(ip, { count: 1, resetTime: now + 3600000 }); // 1 hour reset
+    }
   }
 
   console.log('Function invoked: roast');
