@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { memo, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import logo from '../assets/resume-roaster-logo.png';
 
 function NavbarComponent() {
   const { user, profile, isAdmin, signOut } = useAuth();
@@ -38,15 +39,15 @@ function NavbarComponent() {
 
   return (
     <nav className="bg-paper border-b-2 border-ink shadow-md">
-      <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">⭐</span>
-          <span className="font-display text-ink text-sm tracking-wider hidden sm:inline">
+      <div className="max-w-4xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-0">
+        <div className="flex items-center gap-2 md:gap-3">
+          <img src={logo} alt="Resume Roaster Logo" className="w-10 h-10 md:w-8 md:h-8 object-contain" />
+          <span className="font-display text-ink text-xs sm:text-sm tracking-wider text-center">
             CAREER EVALUATION BUREAU
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-1 md:mt-0">
           <Link to="/" className={linkClass('/')}>
             ROASTER
           </Link>
@@ -59,7 +60,7 @@ function NavbarComponent() {
             </Link>
           )}
 
-          <div className="ml-3 pl-3 border-l border-rule flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-1 sm:ml-2 pl-1 sm:pl-2 sm:border-l border-rule">
             <span className="text-xs font-body text-ink-muted hidden md:inline">
               {profile?.display_name || user.email}
             </span>

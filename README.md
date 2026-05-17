@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./src/assets/resume-roaster-logo.png" alt="Resume Roaster AI Logo" width="300" />
+</p>
+
 # 🎯 Resume Roaster AI
 
 Welcome to **Resume Roaster AI**—the most toxic, unfiltered, and brutal AI-powered resume evaluator on the internet. Built to destroy the egos of overconfident applicants, this app takes your PDF resume and delivers a devastating reality check via a custom-tuned llama-3.1-8b-instant model.
