@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { loginLimiter } from '../lib/rateLimiter';
+import logo from '../assets/resume-roaster-logo.png';
 
 export default function LoginPage() {
   const { user, signIn } = useAuth();
@@ -40,9 +41,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-paper p-8 shadow-lg border-2 border-ink">
         <div className="border-b-2 border-double border-ink pb-4 mb-6 text-center">
           <div className="flex justify-center mb-2">
-            <div className="w-12 h-12 border-2 border-ink rounded-full flex items-center justify-center font-display text-sm">
-              ⭐
-            </div>
+            <img src={logo} alt="Resume Roaster Logo" className="w-32 h-32 object-contain" />
           </div>
           <div className="text-xs text-ink-muted tracking-wider">REPUBLIC OF PROFESSIONAL AFFAIRS</div>
           <h1 className="text-xl font-display text-ink mt-1">Authorized Personnel Access</h1>
