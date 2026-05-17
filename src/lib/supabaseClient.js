@@ -12,5 +12,14 @@ if (!supabaseUrl.startsWith('http')) {
 }
 
 export const supabase = supabaseUrl.startsWith('http')
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: localStorage
+        // Note: NOT specifying storageKey lets Supabase use default keys
+        // This ensures all necessary session metadata is properly stored
+      }
+    })
   : null;

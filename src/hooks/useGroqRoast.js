@@ -12,8 +12,6 @@ export function useGroqRoast() {
     setRoast('');
 
     try {
-      console.log('Edge Function: Calling "roast" function via direct fetch...');
-      
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
@@ -33,10 +31,14 @@ export function useGroqRoast() {
       });
 
       clearTimeout(id);
-      console.log('Edge Function: Response status:', response.status);
+      
+      // Handle 401 Unauthorized
+      if (response.status === 401) {
+        console.error('Unauthorized - Session expired');
+        throw new Error('Your session has expired. Please log in again.');
+      }
       
       const data = await response.json();
-      console.log('Edge Function: Received data:', data);
 
       if (!response.ok) {
         throw new Error(data.error || `Server responded with ${response.status}`);

@@ -4,21 +4,8 @@ import { supabase } from '../lib/supabaseClient';
 export const AuthContext = createContext({});
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    // Synchronously check for session in localStorage to prevent "waiting for supabase" flicker
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const projectId = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
-    if (projectId) {
-      const storageKey = `sb-${projectId}-auth-token`;
-      const saved = localStorage.getItem(storageKey);
-      try {
-        return saved ? JSON.parse(saved).user : null;
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  });
+  // Start with no user - let onAuthStateChange restore it
+  const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(() => {
     // Initial load from localStorage to prevent UI flash
     const saved = localStorage.getItem('roaster_profile');
@@ -28,18 +15,11 @@ export function AuthProvider({ children }) {
       return null;
     }
   });
-  const [loading, setLoading] = useState(() => {
-    // If we have a user in state already, we don't need to show the full-page loader
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const projectId = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
-    if (projectId) {
-      return !localStorage.getItem(`sb-${projectId}-auth-token`);
-    }
-    return true;
-  });
+  const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async (userId, userEmail) => {
     if (!userId || !supabase) {
+      console.warn('Cannot fetch profile: userId or supabase missing');
       setLoading(false);
       return;
     }
@@ -52,8 +32,9 @@ export function AuthProvider({ children }) {
         .single();
       
       if (error) {
-        console.error('Profile fetch error from Supabase:', error);
-        console.log('Error details:', { code: error.code, message: error.message, hint: error.hint });
+        console.error('❌ Profile fetch error:', error);
+        console.error('Error code:', error.code, 'Message:', error.message);
+        
         // If profile doesn't exist, create it
         if (error.code === 'PGRST116') {
           const { data: newProfile, error: insertError } = await supabase
@@ -70,15 +51,16 @@ export function AuthProvider({ children }) {
           if (!insertError) {
             setProfile(newProfile);
             localStorage.setItem('roaster_profile', JSON.stringify(newProfile));
+          } else {
+            console.error('Failed to create profile:', insertError);
           }
         }
       } else if (data) {
-        console.log('Profile successfully fetched:', data);
         setProfile(data);
         localStorage.setItem('roaster_profile', JSON.stringify(data));
       }
     } catch (err) {
-      console.error('Unexpected error in fetchProfile:', err);
+      console.error('❌ Unexpected error in fetchProfile:', err);
     } finally {
       setLoading(false);
     }
@@ -95,27 +77,36 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    console.log('Initiating logout...');
-    
     // Clear local state IMMEDIATELY so the UI responds
     setUser(null);
     setProfile(null);
     
-    // Aggressively clear localStorage
-    localStorage.removeItem('roaster_profile');
+    // Clear all known Supabase and app-related keys from localStorage
+    const keysToAlwaysRemove = [
+      'roaster_profile',
+      'bureau_settings'
+    ];
     
-    // Clear all Supabase and app-related keys in localStorage
+    keysToAlwaysRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
+    
+    // Also remove any old-style keys or other auth-related keys that might exist
     try {
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('sb-') || key.includes('auth-token') || key === 'bureau_settings' || key === 'roaster_profile') {
+      const allKeys = Object.keys(localStorage);
+      allKeys.forEach(key => {
+        if (
+          key.startsWith('sb-') ||
+          key.includes('supabase') ||
+          key.includes('auth-token') ||
+          key.includes('auth')
+        ) {
           localStorage.removeItem(key);
         }
       });
     } catch (e) {
       console.warn('Error clearing localStorage keys:', e);
     }
-    
-    console.log('Local auth state and storage cleared.');
 
     try {
       if (supabase) {
@@ -128,7 +119,6 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error('Logout background error:', err);
     }
-    console.log('Logout process completed.');
   }, []);
 
   useEffect(() => {
@@ -146,7 +136,6 @@ export function AuthProvider({ children }) {
         if (!isSubscribed) return;
 
         const currentUser = session?.user ?? null;
-        console.log('Auth state change detected:', { event: _event, userId: currentUser?.id });
 
         if (!currentUser) {
           // No user - logged out
@@ -161,7 +150,7 @@ export function AuthProvider({ children }) {
           
           // Fetch profile on sign-in or initial load
           if (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION' || !authCheckComplete) {
-            await fetchProfile(currentUser.id, currentUser.email);
+            fetchProfile(currentUser.id, currentUser.email); // Removed await to prevent Supabase deadlock
           }
           
           if (!authCheckComplete) {
@@ -171,25 +160,16 @@ export function AuthProvider({ children }) {
       }
     );
 
-    // Explicitly check for initial session to avoid the "timeout" issue
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (isSubscribed && !authCheckComplete && session) {
-        console.log('Initial session found via getSession()');
-        const currentUser = session.user;
-        setUser(currentUser);
-        fetchProfile(currentUser.id, currentUser.email);
-        authCheckComplete = true;
-      }
-    });
 
-    // Add a fallback timeout in case auth never completes
+    
+    // Set a longer timeout as safety net
     const fallbackTimer = setTimeout(() => {
       if (isSubscribed && !authCheckComplete) {
-        console.warn('Auth check timeout - no session found');
+        console.warn('⚠️ Auth state listener did not fire within 8 seconds - forcing completion');
         setLoading(false);
         authCheckComplete = true;
       }
-    }, 3000);
+    }, 8000);
 
     return () => {
       isSubscribed = false;

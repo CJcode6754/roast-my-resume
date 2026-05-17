@@ -36,28 +36,46 @@ export default function HallOfShamePage() {
 
     const fetchResults = async () => {
       if (!supabase) {
+        console.warn('⚠️ Supabase not initialized for Hall of Shame');
         setLoading(false);
         clearTimeout(timeout);
         return;
       }
+
       try {
-        const { data } = await supabase
+        // Verify session before query (public data but RLS may still require auth)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.warn('⚠️ No active session - public data fetch may fail due to RLS');
+        }
+
+        const { data, error } = await supabase
           .from('roast_results')
           .select('*')
           .eq('is_public', true)
           .order('intensity_score', { ascending: false })
           .limit(50);
 
-        if (data) {
+        if (error) {
+          console.error('❌ Failed to load hall of shame:', error);
+          console.error('  Code:', error.code);
+          console.error('  Status:', error.status);
+          console.error('  Message:', error.message);
+          console.error('  Full error:', JSON.stringify(error));
+        } else if (data) {
           setResults(data);
+        } else {
+          console.warn('⚠️ Hall of Shame query returned null data');
         }
       } catch (err) {
-        console.error('Failed to load hall of shame:', err);
+        console.error('❌ Unexpected error loading hall of shame:', err);
       } finally {
         setLoading(false);
         clearTimeout(timeout);
       }
     };
+
     fetchResults();
 
     return () => clearTimeout(timeout);

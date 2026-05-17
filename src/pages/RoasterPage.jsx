@@ -67,29 +67,47 @@ export default function RoasterPage() {
 
     const fetchSettings = async () => {
       if (!supabase) {
+        console.warn('⚠️ Supabase not initialized');
         setSettingsLoading(false);
         clearTimeout(timeout);
         return;
       }
+
       try {
-        const { data } = await supabase
+        // First, verify we have a valid session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.warn('⚠️ No active session - settings fetch may fail due to RLS');
+        }
+
+        const { data, error } = await supabase
           .from('app_settings')
           .select('*')
           .eq('id', 1)
           .single();
-        if (data) {
+
+        if (error) {
+          console.error('❌ Settings fetch error:', error);
+          console.error('  Code:', error.code);
+          console.error('  Status:', error.status);
+          console.error('  Message:', error.message);
+          console.error('  Full error:', JSON.stringify(error));
+        } else if (data) {
           setRoasterEnabled(data.roaster_enabled);
           setMaintenanceMsg(data.maintenance_message);
-          // Cache settings for instant loading on refresh
           localStorage.setItem('bureau_settings', JSON.stringify(data));
+        } else {
+          console.warn('⚠️ Settings query returned null data');
         }
       } catch (err) {
-        console.error('Settings fetch error:', err);
+        console.error('❌ Unexpected error in settings fetch:', err);
       } finally {
         setSettingsLoading(false);
         clearTimeout(timeout);
       }
     };
+
     fetchSettings();
 
     return () => clearTimeout(timeout);
