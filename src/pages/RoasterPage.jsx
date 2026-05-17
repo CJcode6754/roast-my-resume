@@ -345,7 +345,7 @@ export default function RoasterPage() {
 
       <div className="mt-8 pt-4 border-t-2 border-double border-ink text-center">
         <div className="text-xs font-body text-ink-muted tracking-wider">RESUME ROASTER – OFFICIAL EVALUATION BUREAU</div>
-        <div className="text-xs font-body text-ink-muted">llama 3.3 70b • Groq Free Tier</div>
+        <div className="text-xs font-body text-ink-muted">llama-3.1-8b-instant • Groq Free Tier</div>
         <div className="text-xs font-body text-ink-faint mt-1">🔒 Rate limited • 10 evaluations per hour</div>
       </div>
     </div>
